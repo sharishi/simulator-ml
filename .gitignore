@@ -1,0 +1,5 @@
+.idea/
+.pylintrc/
+.git/
+venv/
+easy/.pytest_cache/
