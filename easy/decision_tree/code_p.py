@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 from dataclasses import dataclass
 import numpy as np
 
@@ -87,7 +88,7 @@ class DecisionTreeRegressor:
     def _split_node(self, X: np.ndarray, y: np.ndarray, depth: int = 0) -> Node:
         """Split a node and return the resulting left and right child nodes."""
         if depth == self.max_depth or y.size < self.min_samples_split:
-            return Node(value=int(round(np.mean(y))), mse=self._mse(y))
+            return Node(value=int(round(np.mean(y))), mse=self._mse(y), n_samples=y.size)
 
         best_idx, best_thr = self._best_split(X, y)
         if best_thr is None:
@@ -99,6 +100,57 @@ class DecisionTreeRegressor:
         left_child = self._split_node(X[left_idx], y[left_idx], depth + 1)
         right_child = self._split_node(X[right_idx], y[right_idx], depth + 1)
 
-        return Node(feature=best_idx, threshold=best_thr, left=left_child, right=right_child,
+        return Node(feature=best_idx, threshold=best_thr, n_samples=y.size, left=left_child, right=right_child,
                     value=int(round(np.mean(y))),
                     mse=self._mse(y))
+
+    def as_json(self) -> str:
+        """Return the decision tree as a JSON string."""
+        return json.dumps(self._as_json(self.tree_), indent=4)
+
+    def _as_json(self, node: Node) -> dict:
+        if node is None:
+            return None  # JSON-совместимая строка для None
+
+        if node.left is None and node.right is None:
+            return {
+                'value': int(node.value) if node.value is not None else None,
+                'n_samples': int(node.n_samples) if node.n_samples is not None else None,
+                'mse': round(float(node.mse), 2) if node.mse is not None else None
+            }
+
+        return {
+            'feature': int(node.feature) if node.feature is not None else None,
+            'threshold': int(node.threshold) if node.threshold is not None else None,
+            'n_samples': int(node.n_samples) if node.n_samples is not None else None,
+            'mse': round(float(node.mse), 2) if node.mse is not None else None,
+            'left': self._as_json(node.left),
+            'right': self._as_json(node.right)
+        }
+
+    def _predict_one_sample(self, features: np.ndarray) -> int:
+        """Predict the target value of a single sample."""
+        node = self.tree_
+        while node.left or node.right:
+            if features[node.feature] < node.threshold:
+                node = node.left
+            else:
+                node = node.right
+        return node.value
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+    Predict regression target for X.
+
+    Parameters
+    ----------
+    X : array-like, shape (n_samples, n_features)
+        The input samples.
+
+    Returns
+    -------
+    y : array of shape (n_samples,)
+        The predicted values.
+    """
+        # YOUR CODE HERE
+        return np.array([self._predict_one_sample(sample) for sample in X])
